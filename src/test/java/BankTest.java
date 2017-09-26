@@ -1,12 +1,19 @@
+
+import com.tngtech.java.junit.dataprovider.DataProvider;
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import org.javamoney.moneta.Money;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 import javax.money.Monetary;
 import javax.money.MonetaryAmount;
 import java.math.BigDecimal;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(DataProviderRunner.class)
 public class BankTest {
 
     Bank bank = new Bank();
@@ -81,14 +88,27 @@ public class BankTest {
         assertTrue(user1.getAccountValue().equals(Money.of(10100.0, Monetary.getCurrency("PLN"))));
     }
 
-    @Test
-    public void shouldBuyAndSellEuro () {
+    @DataProvider
+    public static Object[][] userAndValue() {
         User user1 = new User("Krzysztof Kowlalski", BigDecimal.valueOf(10000));
-        bank.buyEuroCurrency(user1, BigDecimal.valueOf(100));
-        assertTrue(user1.getAccountValue().isEqualTo(Money.of(10000-(100*4.27), Monetary.getCurrency("PLN"))));
-        assertTrue(user1.getEuroCurrencyAccountValue().isEqualTo(Money.of(100, Monetary.getCurrency("EUR"))));
-        bank.sellEuroCurrency(user1);
-        assertTrue(user1.getAccountValue().isEqualTo(Money.of(10000, Monetary.getCurrency("PLN"))));
-        assertTrue(user1.getEuroCurrencyAccountValue().isEqualTo(Money.of(0, Monetary.getCurrency("EUR"))));
+        User user2 = new User("Antoni Nowak", BigDecimal.valueOf(1000));
+        return new Object[][] {
+                {user1, BigDecimal.valueOf(1000)},
+                {user2, BigDecimal.valueOf(1000)}
+        };
+    }
+
+    @Test
+    @UseDataProvider("userAndValue")
+    public void shouldBuyAndSellEuro (final User user, final BigDecimal value) {
+        MonetaryAmount valueAccountPLNBefore = user.getAccountValue();
+        MonetaryAmount valueAccountEURBefore = user.getEuroCurrencyAccountValue();
+        bank.buyEuroCurrency(user, value);
+        MonetaryAmount valuePLN = Money.of(value.multiply(BigDecimal.valueOf(4.27)), Monetary.getCurrency("PLN"));
+        assertThat(user.getAccountValue().isEqualTo(valueAccountPLNBefore.subtract(valuePLN)));
+        assertThat(user.getEuroCurrencyAccountValue().isEqualTo(valueAccountEURBefore.add(Money.of(value, Monetary.getCurrency("EUR")))));
+        bank.sellEuroCurrency(user);
+        assertThat(user.getAccountValue().isEqualTo(valueAccountPLNBefore));
+        assertThat(user.getEuroCurrencyAccountValue().isEqualTo(Money.of(0, Monetary.getCurrency("EUR"))));
     }
 }
